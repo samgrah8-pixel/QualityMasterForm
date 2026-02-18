@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY_PREFIX = "quality-master-live-form:v11";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v13";
 
 // Branding
 const BRAND = "#2cb889";
+const BLACK = "#111";
 const FONT_IMPORT_URL =
   "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap";
 
@@ -11,7 +12,7 @@ const FONT_IMPORT_URL =
 const LOGO_URL =
   "https://cdn.prod.website-files.com/66a3bb83d541c20d74e15117/67193a9cfdf685f3e0c7fca7_BuildingComposites-Horizontal-RGB-FullGreen-p-2000.png";
 
-const LOGO_HEIGHT_PX = 46;
+const LOGO_HEIGHT_PX = 55;
 
 // Markup legend/colors
 const LEGEND = [
@@ -53,6 +54,7 @@ function Card({ children, style }) {
         borderRadius: 14,
         padding: 16,
         boxShadow: "0 1px 0 rgba(0,0,0,0.02)",
+        fontFamily: "inherit",
         ...(style || {}),
       }}
     >
@@ -61,25 +63,39 @@ function Card({ children, style }) {
   );
 }
 
-function Section({ title, children, subtitle }) {
+function SectionHeader({ title, subtitle }) {
   return (
-    <div style={{ marginBottom: 18 }}>
-      <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
-        <div style={{ fontSize: 18, fontWeight: 900, color: BRAND }}>
-          {title}
-        </div>
-        {subtitle ? (
-          <div style={{ fontSize: 12, color: "#666" }}>{subtitle}</div>
-        ) : null}
+    <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
+      <div
+        style={{
+          fontSize: 18,
+          fontWeight: 500,
+          color: BRAND,
+          fontFamily: "inherit",
+        }}
+      >
+        {title}
       </div>
-      <Card>{children}</Card>
+      {subtitle ? (
+        <div style={{ fontSize: 12, color: "#666", fontFamily: "inherit" }}>
+          {subtitle}
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function FieldLabel({ children }) {
   return (
-    <div style={{ fontSize: 12, color: "#444", marginBottom: 6 }}>
+    <div
+      style={{
+        fontSize: 12,
+        color: "#444",
+        marginBottom: 6,
+        fontFamily: "inherit",
+        fontWeight: 500,
+      }}
+    >
       {children}
     </div>
   );
@@ -96,8 +112,10 @@ function TextField(props) {
         borderRadius: 10,
         border: "1px solid #d7d7d7",
         fontSize: 14,
+        fontFamily: "inherit",
         outline: "none",
         background: props.readOnly ? "#f7f7f7" : "#fff",
+        color: BLACK,
         ...(props.style || {}),
       }}
     />
@@ -115,35 +133,56 @@ function TextArea(props) {
         borderRadius: 10,
         border: "1px solid #d7d7d7",
         fontSize: 14,
+        fontFamily: "inherit",
         minHeight: 90,
         outline: "none",
         background: "#fff",
         resize: "vertical",
+        color: BLACK,
         ...(props.style || {}),
       }}
     />
   );
 }
 
-function Button({ children, onClick, type = "button", style }) {
+function Button({ children, onClick, type = "button", style, disabled }) {
   return (
     <button
       type={type}
       onClick={onClick}
+      disabled={disabled}
       style={{
-        padding: "9px 12px",
+        padding: "10px 14px",
         borderRadius: 10,
         border: "1px solid #d7d7d7",
-        background: "#fff",
-        cursor: "pointer",
+        background: disabled ? "#f3f3f3" : "#fff",
+        cursor: disabled ? "not-allowed" : "pointer",
         fontSize: 13,
-        fontWeight: 800,
+        fontFamily: "inherit",
+        fontWeight: 500,
         whiteSpace: "nowrap",
+        color: BLACK,
         ...(style || {}),
       }}
     >
       {children}
     </button>
+  );
+}
+
+function PrimaryButton({ children, onClick, disabled }) {
+  return (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        borderColor: BRAND,
+        background: disabled ? "#e9f7f1" : BRAND,
+        color: disabled ? "#6aa893" : "#fff",
+      }}
+    >
+      {children}
+    </Button>
   );
 }
 
@@ -162,9 +201,12 @@ function ChecklistInitials({ items, onChange }) {
             border: "1px solid #efefef",
             borderRadius: 12,
             background: "#fff",
+            fontFamily: "inherit",
           }}
         >
-          <div style={{ lineHeight: 1.25, fontSize: 14 }}>{it.label}</div>
+          <div style={{ lineHeight: 1.25, fontSize: 14, color: BLACK }}>
+            {it.label}
+          </div>
           <TextField
             placeholder="Initials"
             value={it.initials}
@@ -176,16 +218,63 @@ function ChecklistInitials({ items, onChange }) {
   );
 }
 
+function StepPills({ current, onGo }) {
+  const steps = [
+    { key: 0, label: "IP6" },
+    { key: 1, label: "IP8" },
+    { key: 2, label: "Visual" },
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+      {steps.map((s) => {
+        const active = s.key === current;
+        return (
+          <button
+            key={s.key}
+            type="button"
+            onClick={() => onGo(s.key)}
+            style={{
+              padding: "7px 10px",
+              borderRadius: 999,
+              border: active ? `2px solid ${BRAND}` : "1px solid #d7d7d7",
+              background: active ? "rgba(44,184,137,0.10)" : "#fff",
+              cursor: "pointer",
+              fontSize: 13,
+              fontFamily: "inherit",
+              fontWeight: 500,
+              color: BLACK,
+            }}
+          >
+            {s.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
-  // Load Montserrat font
+  // Load Montserrat + global safety CSS so NOTHING falls back
   useEffect(() => {
     const id = "qc-montserrat-font";
-    if (document.getElementById(id)) return;
-    const link = document.createElement("link");
-    link.id = id;
-    link.rel = "stylesheet";
-    link.href = FONT_IMPORT_URL;
-    document.head.appendChild(link);
+    if (!document.getElementById(id)) {
+      const link = document.createElement("link");
+      link.id = id;
+      link.rel = "stylesheet";
+      link.href = FONT_IMPORT_URL;
+      document.head.appendChild(link);
+    }
+
+    const styleId = "qc-global-font";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.innerHTML = `
+        * { font-family: "Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+        button, input, textarea, select { font-family: inherit; }
+      `;
+      document.head.appendChild(style);
+    }
   }, []);
 
   // PO from URL + per-PO storage key
@@ -198,6 +287,7 @@ export default function App() {
   const defaultData = useMemo(
     () => ({
       header: { productionOrder: "", panelSerial: "" },
+      nav: { step: 0 }, // 0=IP6, 1=IP8, 2=Visual
 
       ip6: {
         date: "",
@@ -321,15 +411,12 @@ export default function App() {
     () => safeParse(localStorage.getItem(storageKey)) || defaultData
   );
 
-  // If URL included ?po=..., set it once and lock input UI
+  // Lock PO from URL (once)
   useEffect(() => {
     if (!poFromUrl) return;
     setData((p) => {
       if (p.header?.productionOrder) return p;
-      return {
-        ...p,
-        header: { ...p.header, productionOrder: poFromUrl },
-      };
+      return { ...p, header: { ...p.header, productionOrder: poFromUrl } };
     });
   }, [poFromUrl]);
 
@@ -340,12 +427,14 @@ export default function App() {
 
   const productionOrder = data.header.productionOrder;
   const panelSerial = data.header.panelSerial;
+  const step = data.nav?.step ?? 0;
 
   const setProductionOrder = (v) =>
     setData((p) => ({ ...p, header: { ...p.header, productionOrder: v } }));
-
   const setPanelSerial = (v) =>
     setData((p) => ({ ...p, header: { ...p.header, panelSerial: v } }));
+  const goStep = (next) =>
+    setData((p) => ({ ...p, nav: { ...p.nav, step: next } }));
 
   function setInitials(sectionKey, itemId, value) {
     setData((prev) => ({
@@ -364,6 +453,21 @@ export default function App() {
   const drawCanvasRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastRef = useRef(null);
+
+  // NEW: autosave drawing while drawing (debounced)
+  const saveTimerRef = useRef(null);
+  const scheduleAutoSave = () => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveDrawingToState();
+    }, 350);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const canvas = bgCanvasRef.current;
@@ -464,13 +568,24 @@ export default function App() {
     const next = getPoint(e, canvas);
     drawLine(lastRef.current, next);
     lastRef.current = next;
+
+    // NEW: auto-save while drawing
+    scheduleAutoSave();
   }
 
-  function onPointerUp() {
+  function endStrokeAndSave() {
     if (!isDrawingRef.current) return;
     isDrawingRef.current = false;
     lastRef.current = null;
+
+    // Flush any pending autosave + save immediately
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = null;
     saveDrawingToState();
+  }
+
+  function onPointerUp() {
+    endStrokeAndSave();
   }
 
   function clearDrawingOnly() {
@@ -523,6 +638,30 @@ export default function App() {
     a.click();
   }
 
+  const pageStyle = {
+    maxWidth: 1100,
+    margin: "0 auto",
+    padding: 16,
+    background: "#fafafa",
+    minHeight: "100vh",
+    fontFamily:
+      '"Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+    color: BLACK,
+  };
+
+  const contextChip = {
+    display: "inline-flex",
+    gap: 8,
+    alignItems: "center",
+    border: "1px solid #e7e7e7",
+    background: "#fff",
+    padding: "7px 10px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontFamily: "inherit",
+    color: BLACK,
+  };
+
   const twoCol = {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1fr)",
@@ -535,341 +674,245 @@ export default function App() {
     gap: 14,
   };
 
-  const pageStyle = {
-    maxWidth: 1100,
-    margin: "0 auto",
-    padding: 16,
-    fontFamily:
-      '"Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
-    background: "#fafafa",
-    minHeight: "100vh",
-  };
+  // --- Page content by step ---
+  const StepContent = () => {
+    if (step === 0) {
+      return (
+        <Card>
+          <SectionHeader
+            title="Inspection Point 6"
+            subtitle="Pre-Paint Line Inspection"
+          />
 
-  const contextChip = {
-    display: "inline-flex",
-    gap: 8,
-    alignItems: "center",
-    border: "1px solid #e7e7e7",
-    background: "#fff",
-    padding: "7px 10px",
-    borderRadius: 999,
-    fontSize: 13,
-  };
-
-  return (
-    <div style={pageStyle}>
-      {/* HEADER */}
-      <Card style={{ padding: 16 }}>
-        <div
-          style={{
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 60,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src={LOGO_URL}
-              alt=""
-              style={{ height: LOGO_HEIGHT_PX, objectFit: "contain" }}
+          <div style={{ maxWidth: 320 }}>
+            <FieldLabel>Date</FieldLabel>
+            <TextField
+              type="date"
+              value={data.ip6.date}
+              onChange={(e) =>
+                setData((p) => ({
+                  ...p,
+                  ip6: { ...p.ip6, date: e.target.value },
+                }))
+              }
             />
           </div>
+
+          <div style={{ height: 12 }} />
+
+          <ChecklistInitials
+            items={data.ip6.items}
+            onChange={(id, v) => setInitials("ip6", id, v)}
+          />
+
+          <div style={{ height: 12 }} />
+
+          <div style={twoCol}>
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Ready for Primer</FieldLabel>
+              <TextField
+                placeholder="Initials"
+                value={data.ip6.readyForPrimerInitials}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    ip6: { ...p.ip6, readyForPrimerInitials: e.target.value },
+                  }))
+                }
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea
+                value={data.ip6.notes}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    ip6: { ...p.ip6, notes: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          </div>
+        </Card>
+      );
+    }
+
+    if (step === 1) {
+      return (
+        <Card>
+          <SectionHeader
+            title="Inspection Point 8"
+            subtitle="Post-Paint Inspection (Coraflon)"
+          />
+
+          <div style={{ maxWidth: 320 }}>
+            <FieldLabel>Date</FieldLabel>
+            <TextField
+              type="date"
+              value={data.ip8.date}
+              onChange={(e) =>
+                setData((p) => ({
+                  ...p,
+                  ip8: { ...p.ip8, date: e.target.value },
+                }))
+              }
+            />
+          </div>
+
+          <div style={{ height: 12 }} />
+
+          <ChecklistInitials
+            items={data.ip8.items}
+            onChange={(id, v) => setInitials("ip8", id, v)}
+          />
+
+          <div style={{ height: 12 }} />
+
+          <div style={twoCol}>
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Remove from the Paintline</FieldLabel>
+              <TextField
+                placeholder="Initials"
+                value={data.ip8.removeFromPaintlineInitials}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    ip8: {
+                      ...p.ip8,
+                      removeFromPaintlineInitials: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Notes</FieldLabel>
+              <TextArea
+                value={data.ip8.notes}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    ip8: { ...p.ip8, notes: e.target.value },
+                  }))
+                }
+              />
+            </div>
+          </div>
+        </Card>
+      );
+    }
+
+    // step === 2
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
+        <Card>
+          <SectionHeader title="Visual Inspection Guide" />
+
+          <div style={{ maxWidth: 320 }}>
+            <FieldLabel>Date</FieldLabel>
+            <TextField
+              type="date"
+              value={data.visual.date}
+              onChange={(e) =>
+                setData((p) => ({
+                  ...p,
+                  visual: { ...p.visual, date: e.target.value },
+                }))
+              }
+            />
+          </div>
+
+          <div style={{ height: 12 }} />
+
+          <div style={threeCol}>
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Approved for primer</FieldLabel>
+              <TextField
+                placeholder="Initials"
+                value={data.visual.approvedForPrimerInitials}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    visual: {
+                      ...p.visual,
+                      approvedForPrimerInitials: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>Approved for topcoat</FieldLabel>
+              <TextField
+                placeholder="Initials"
+                value={data.visual.approvedForTopcoatInitials}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    visual: {
+                      ...p.visual,
+                      approvedForTopcoatInitials: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+
+            <div style={{ minWidth: 0 }}>
+              <FieldLabel>QC Final Approval</FieldLabel>
+              <TextField
+                placeholder="Initials"
+                value={data.visual.qcFinalApprovalInitials}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    visual: {
+                      ...p.visual,
+                      qcFinalApprovalInitials: e.target.value,
+                    },
+                  }))
+                }
+              />
+            </div>
+          </div>
+
+          <div style={{ height: 12 }} />
+
+          <ChecklistInitials
+            items={data.visual.items}
+            onChange={(id, v) => setInitials("visual", id, v)}
+          />
+
+          <div style={{ height: 12 }} />
+
+          <FieldLabel>Notes</FieldLabel>
+          <TextArea
+            value={data.visual.notes}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                visual: { ...p.visual, notes: e.target.value },
+              }))
+            }
+          />
+        </Card>
+
+        {/* Markup */}
+        <Card>
+          <SectionHeader title="Markup" subtitle="" />
 
           <div
             style={{
-              position: "absolute",
-              left: "50%",
-              transform: "translateX(-50%)",
-              fontSize: 26,
-              fontWeight: 900,
-              color: BRAND,
-              pointerEvents: "none",
-              letterSpacing: 0.2,
+              fontWeight: 500,
+              marginBottom: 8,
+              color: BLACK,
+              fontFamily: "inherit",
             }}
           >
-            Quality Master
-          </div>
-
-          {/* No Reset button (per request) */}
-          <div style={{ width: 1, height: 1 }} />
-        </div>
-
-        {/* Key fields */}
-        <div
-          style={{
-            marginTop: 14,
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: 12,
-            maxWidth: 760,
-          }}
-        >
-          <div>
-            <FieldLabel>Production Order</FieldLabel>
-            <TextField
-              value={productionOrder}
-              onChange={(e) => setProductionOrder(e.target.value)}
-              placeholder="Use a PO link (?po=...) or enter here"
-              readOnly={!!poFromUrl}
-            />
-            {!!poFromUrl && (
-              <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
-                Locked from link: <b>{poFromUrl}</b>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <FieldLabel>Panel Serial</FieldLabel>
-            <TextField
-              value={panelSerial}
-              onChange={(e) => setPanelSerial(e.target.value)}
-              placeholder="Enter panel serial"
-            />
-          </div>
-        </div>
-      </Card>
-
-      {/* Sticky context bar */}
-      <div
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          background: "rgba(250,250,250,0.92)",
-          backdropFilter: "blur(6px)",
-          padding: "10px 0",
-          marginTop: 10,
-          marginBottom: 12,
-          borderBottom: "1px solid #eee",
-        }}
-      >
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <div style={contextChip}>
-            <span style={{ fontWeight: 900, color: BRAND }}>PO</span>
-            <span>{productionOrder || "—"}</span>
-          </div>
-          <div style={contextChip}>
-            <span style={{ fontWeight: 900, color: BRAND }}>Panel</span>
-            <span>{panelSerial || "—"}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* IP6 */}
-      <Section title="Inspection Point 6" subtitle="Pre-Paint Line Inspection">
-        <div style={{ maxWidth: 320 }}>
-          <FieldLabel>Date</FieldLabel>
-          <TextField
-            type="date"
-            value={data.ip6.date}
-            onChange={(e) =>
-              setData((p) => ({
-                ...p,
-                ip6: { ...p.ip6, date: e.target.value },
-              }))
-            }
-          />
-        </div>
-
-        <div style={{ height: 12 }} />
-
-        <ChecklistInitials
-          items={data.ip6.items}
-          onChange={(id, v) => setInitials("ip6", id, v)}
-        />
-
-        <div style={{ height: 12 }} />
-
-        <div style={twoCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Ready for Primer</FieldLabel>
-            <TextField
-              placeholder="Initials"
-              value={data.ip6.readyForPrimerInitials}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip6: { ...p.ip6, readyForPrimerInitials: e.target.value },
-                }))
-              }
-            />
-          </div>
-
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Notes</FieldLabel>
-            <TextArea
-              value={data.ip6.notes}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip6: { ...p.ip6, notes: e.target.value },
-                }))
-              }
-            />
-          </div>
-        </div>
-      </Section>
-
-      {/* IP8 */}
-      <Section
-        title="Inspection Point 8"
-        subtitle="Post-Paint Inspection (Coraflon)"
-      >
-        <div style={{ maxWidth: 320 }}>
-          <FieldLabel>Date</FieldLabel>
-          <TextField
-            type="date"
-            value={data.ip8.date}
-            onChange={(e) =>
-              setData((p) => ({
-                ...p,
-                ip8: { ...p.ip8, date: e.target.value },
-              }))
-            }
-          />
-        </div>
-
-        <div style={{ height: 12 }} />
-
-        <ChecklistInitials
-          items={data.ip8.items}
-          onChange={(id, v) => setInitials("ip8", id, v)}
-        />
-
-        <div style={{ height: 12 }} />
-
-        <div style={twoCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Remove from the Paintline</FieldLabel>
-            <TextField
-              placeholder="Initials"
-              value={data.ip8.removeFromPaintlineInitials}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip8: {
-                    ...p.ip8,
-                    removeFromPaintlineInitials: e.target.value,
-                  },
-                }))
-              }
-            />
-          </div>
-
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Notes</FieldLabel>
-            <TextArea
-              value={data.ip8.notes}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip8: { ...p.ip8, notes: e.target.value },
-                }))
-              }
-            />
-          </div>
-        </div>
-      </Section>
-
-      {/* Visual */}
-      <Section title="Visual Inspection Guide">
-        <div style={{ maxWidth: 320 }}>
-          <FieldLabel>Date</FieldLabel>
-          <TextField
-            type="date"
-            value={data.visual.date}
-            onChange={(e) =>
-              setData((p) => ({
-                ...p,
-                visual: { ...p.visual, date: e.target.value },
-              }))
-            }
-          />
-        </div>
-
-        <div style={{ height: 12 }} />
-
-        <div style={threeCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Approved for primer</FieldLabel>
-            <TextField
-              placeholder="Initials"
-              value={data.visual.approvedForPrimerInitials}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  visual: {
-                    ...p.visual,
-                    approvedForPrimerInitials: e.target.value,
-                  },
-                }))
-              }
-            />
-          </div>
-
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Approved for topcoat</FieldLabel>
-            <TextField
-              placeholder="Initials"
-              value={data.visual.approvedForTopcoatInitials}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  visual: {
-                    ...p.visual,
-                    approvedForTopcoatInitials: e.target.value,
-                  },
-                }))
-              }
-            />
-          </div>
-
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>QC Final Approval</FieldLabel>
-            <TextField
-              placeholder="Initials"
-              value={data.visual.qcFinalApprovalInitials}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  visual: {
-                    ...p.visual,
-                    qcFinalApprovalInitials: e.target.value,
-                  },
-                }))
-              }
-            />
-          </div>
-        </div>
-
-        <div style={{ height: 12 }} />
-
-        <ChecklistInitials
-          items={data.visual.items}
-          onChange={(id, v) => setInitials("visual", id, v)}
-        />
-
-        <div style={{ height: 12 }} />
-
-        <FieldLabel>Notes</FieldLabel>
-        <TextArea
-          value={data.visual.notes}
-          onChange={(e) =>
-            setData((p) => ({
-              ...p,
-              visual: { ...p.visual, notes: e.target.value },
-            }))
-          }
-        />
-      </Section>
-
-      {/* Markup */}
-      <Section title="Markup" subtitle="Annotate on top of an uploaded image">
-        <Card style={{ padding: 14, marginBottom: 12 }}>
-          <div style={{ fontWeight: 900, marginBottom: 8, color: BRAND }}>
             Color Legend
           </div>
 
@@ -879,6 +922,7 @@ export default function App() {
               flexWrap: "wrap",
               gap: 8,
               alignItems: "center",
+              marginBottom: 12,
             }}
           >
             {LEGEND.map((l) => {
@@ -902,10 +946,12 @@ export default function App() {
                     padding: "7px 10px",
                     borderRadius: 999,
                     border: active ? `2px solid ${BRAND}` : "1px solid #d7d7d7",
-                    background: "#fff",
+                    background: active ? "rgba(44,184,137,0.10)" : "#fff",
                     cursor: "pointer",
                     fontSize: 13,
-                    fontWeight: 800,
+                    fontFamily: "inherit",
+                    fontWeight: 500,
+                    color: BLACK,
                   }}
                 >
                   <span
@@ -938,10 +984,15 @@ export default function App() {
                   data.markup.tool === "ERASER"
                     ? `2px solid ${BRAND}`
                     : "1px solid #d7d7d7",
-                background: "#fff",
+                background:
+                  data.markup.tool === "ERASER"
+                    ? "rgba(44,184,137,0.10)"
+                    : "#fff",
                 cursor: "pointer",
                 fontSize: 13,
-                fontWeight: 900,
+                fontFamily: "inherit",
+                fontWeight: 500,
+                color: BLACK,
               }}
             >
               Eraser
@@ -952,10 +1003,10 @@ export default function App() {
                 display: "flex",
                 gap: 8,
                 alignItems: "center",
-                marginLeft: 6,
+                fontFamily: "inherit",
               }}
             >
-              <span style={{ fontWeight: 900, color: BRAND }}>Brush</span>
+              <span style={{ fontWeight: 500, color: BLACK }}>Brush</span>
               <input
                 type="range"
                 min={2}
@@ -964,64 +1015,66 @@ export default function App() {
                 onChange={(e) =>
                   setData((p) => ({
                     ...p,
-                    markup: {
-                      ...p.markup,
-                      brushSize: Number(e.target.value),
-                    },
+                    markup: { ...p.markup, brushSize: Number(e.target.value) },
                   }))
                 }
               />
-              <span style={{ width: 52, textAlign: "right", fontWeight: 800 }}>
+              <span style={{ width: 52, textAlign: "right", fontWeight: 500 }}>
                 {data.markup.brushSize}px
               </span>
             </label>
           </div>
-        </Card>
 
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            flexWrap: "wrap",
-            alignItems: "center",
-            marginBottom: 12,
-          }}
-        >
-          <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <span style={{ fontWeight: 900, color: BRAND }}>Upload image</span>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = () =>
-                  setData((p) => ({
-                    ...p,
-                    markup: {
-                      ...p.markup,
-                      backgroundImageDataUrl: String(reader.result || ""),
-                    },
-                  }));
-                reader.readAsDataURL(file);
-                e.target.value = "";
-              }}
-            />
-          </label>
-
-          <Button onClick={clearDrawingOnly}>Clear Drawing</Button>
-          <Button onClick={clearBackgroundAndDrawing}>Clear Background</Button>
-          <Button onClick={saveDrawingToState}>Save Drawing</Button>
-          <Button
-            onClick={exportFlattenedPng}
-            style={{ borderColor: BRAND, color: BRAND }}
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              alignItems: "center",
+              marginBottom: 12,
+            }}
           >
-            Download PNG
-          </Button>
-        </div>
+            <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <span style={{ fontWeight: 500, color: BLACK }}>
+                Upload image
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () =>
+                    setData((p) => ({
+                      ...p,
+                      markup: {
+                        ...p.markup,
+                        backgroundImageDataUrl: String(reader.result || ""),
+                      },
+                    }));
+                  reader.readAsDataURL(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
 
-        <Card style={{ padding: 0 }}>
+            <Button onClick={clearDrawingOnly}>Clear Drawing</Button>
+            <Button onClick={clearBackgroundAndDrawing}>
+              Clear Background
+            </Button>
+
+            {/* Save button still available (optional), but autosave now works */}
+            <Button onClick={saveDrawingToState}>Save Drawing</Button>
+
+            <Button
+              onClick={exportFlattenedPng}
+              style={{ borderColor: BRAND, color: BRAND }}
+            >
+              Download PNG
+            </Button>
+          </div>
+
           <div
             style={{
               border: "1px solid #e6e6e6",
@@ -1063,8 +1116,157 @@ export default function App() {
               />
             </div>
           </div>
+
+          <div style={{ fontSize: 12, color: "BLACK", marginTop: 10 }}>
+            Auto-save is enabled
+          </div>
         </Card>
-      </Section>
+      </div>
+    );
+  };
+
+  return (
+    <div style={pageStyle}>
+      {/* HEADER */}
+      <Card style={{ padding: 16 }}>
+        <div
+          style={{
+            position: "relative",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            minHeight: 60,
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <img
+              src={LOGO_URL}
+              alt=""
+              style={{ height: LOGO_HEIGHT_PX, objectFit: "contain" }}
+            />
+          </div>
+
+          {/* Quality Master: black + Montserrat */}
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              transform: "translateX(-50%)",
+              fontSize: 23,
+              fontWeight: 500,
+              color: BLACK,
+              pointerEvents: "none",
+              letterSpacing: 0.2,
+              fontFamily: "inherit",
+            }}
+          >
+            QUALITY FORM
+          </div>
+
+          <div style={{ width: 1, height: 1 }} />
+        </div>
+
+        {/* Key fields */}
+        <div
+          style={{
+            marginTop: 14,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 12,
+            maxWidth: 760,
+          }}
+        >
+          <div>
+            <FieldLabel>Production Order</FieldLabel>
+            <TextField
+              value={productionOrder}
+              onChange={(e) => setProductionOrder(e.target.value)}
+              placeholder="Use a production order link"
+              readOnly={!!poFromUrl}
+            />
+            {!!poFromUrl && (
+              <div style={{ fontSize: 12, color: "BLACK", marginTop: 6 }}>
+                Locked from link: <b>{poFromUrl}</b>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <FieldLabel>Panel Serial</FieldLabel>
+            <TextField
+              value={panelSerial}
+              onChange={(e) => setPanelSerial(e.target.value)}
+              placeholder="Enter panel serial"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Sticky nav */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "rgba(250,250,250,0.92)",
+          backdropFilter: "blur(6px)",
+          padding: "10px 0",
+          marginTop: 10,
+          marginBottom: 12,
+          borderBottom: "1px solid #eee",
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "center",
+          }}
+        >
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <div style={contextChip}>
+              <span style={{ fontWeight: 500, color: BRAND }}>PO</span>
+              <span>{productionOrder || "—"}</span>
+            </div>
+            <div style={contextChip}>
+              <span style={{ fontWeight: 500, color: BRAND }}>Panel</span>
+              <span>{panelSerial || "—"}</span>
+            </div>
+          </div>
+
+          <StepPills current={step} onGo={goStep} />
+        </div>
+      </div>
+
+      {/* Step content */}
+      <StepContent />
+
+      {/* Bottom navigation */}
+      <div style={{ height: 14 }} />
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 10 }}
+      >
+        <Button
+          onClick={() => goStep(Math.max(0, step - 1))}
+          disabled={step === 0}
+        >
+          ← Back
+        </Button>
+
+        {step < 2 ? (
+          <PrimaryButton onClick={() => goStep(Math.min(2, step + 1))}>
+            Next →
+          </PrimaryButton>
+        ) : (
+          <PrimaryButton
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          >
+            Back to top ↑
+          </PrimaryButton>
+        )}
+      </div>
 
       <div style={{ height: 24 }} />
     </div>
