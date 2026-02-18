@@ -1,18 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY_PREFIX = "quality-master-live-form:v10";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v11";
+
+// Branding
+const BRAND = "#2cb889";
+const FONT_IMPORT_URL =
+  "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap";
 
 // Hosted logo URL (stable)
 const LOGO_URL =
   "https://cdn.prod.website-files.com/66a3bb83d541c20d74e15117/67193a9cfdf685f3e0c7fca7_BuildingComposites-Horizontal-RGB-FullGreen-p-2000.png";
 
-// 35% smaller logo vs ~70px baseline => 70 * 0.65 = 45.5
 const LOGO_HEIGHT_PX = 46;
 
-// Markup legend/colors (UPDATED):
-// - Removed "Contamination"
-// - HIGH = Pink
-// - LOW = Yellow
+// Markup legend/colors
 const LEGEND = [
   { key: "HIGH", label: "High", color: "#ff4da6" }, // pink
   { key: "LOW", label: "Low", color: "#ffd400" }, // yellow
@@ -36,26 +37,23 @@ function safeParse(raw) {
   }
 }
 
-/**
- * Best-practice PO handling:
- * - Read PO from URL query param: ?po=10001
- * - Use a PER-PO localStorage key so different POs don't overwrite each other on the same device
- * - Lock PO field (readOnly) when it comes from the URL to avoid accidental wrong PO
- */
+// PO from URL: ?po=10001
 function getPoFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return (params.get("po") || "").trim();
 }
 
 // ---------------- UI primitives ----------------
-function Card({ children }) {
+function Card({ children, style }) {
   return (
     <div
       style={{
         background: "#fff",
-        border: "1px solid #e6e6e6",
-        borderRadius: 12,
-        padding: 14,
+        border: "1px solid #e7e7e7",
+        borderRadius: 14,
+        padding: 16,
+        boxShadow: "0 1px 0 rgba(0,0,0,0.02)",
+        ...(style || {}),
       }}
     >
       {children}
@@ -63,11 +61,16 @@ function Card({ children }) {
   );
 }
 
-function Section({ title, children }) {
+function Section({ title, children, subtitle }) {
   return (
-    <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 18, fontWeight: 800, marginBottom: 10 }}>
-        {title}
+    <div style={{ marginBottom: 18 }}>
+      <div style={{ display: "grid", gap: 4, marginBottom: 10 }}>
+        <div style={{ fontSize: 18, fontWeight: 900, color: BRAND }}>
+          {title}
+        </div>
+        {subtitle ? (
+          <div style={{ fontSize: 12, color: "#666" }}>{subtitle}</div>
+        ) : null}
       </div>
       <Card>{children}</Card>
     </div>
@@ -94,7 +97,7 @@ function TextField(props) {
         border: "1px solid #d7d7d7",
         fontSize: 14,
         outline: "none",
-        background: "#fff",
+        background: props.readOnly ? "#f7f7f7" : "#fff",
         ...(props.style || {}),
       }}
     />
@@ -122,7 +125,7 @@ function TextArea(props) {
   );
 }
 
-function Button({ children, onClick, type = "button" }) {
+function Button({ children, onClick, type = "button", style }) {
   return (
     <button
       type={type}
@@ -134,8 +137,9 @@ function Button({ children, onClick, type = "button" }) {
         background: "#fff",
         cursor: "pointer",
         fontSize: 13,
-        fontWeight: 700,
+        fontWeight: 800,
         whiteSpace: "nowrap",
+        ...(style || {}),
       }}
     >
       {children}
@@ -151,7 +155,7 @@ function ChecklistInitials({ items, onChange }) {
           key={it.id}
           style={{
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) minmax(160px, 240px)",
+            gridTemplateColumns: "minmax(0, 1fr) 160px",
             gap: 12,
             alignItems: "center",
             padding: 12,
@@ -160,7 +164,7 @@ function ChecklistInitials({ items, onChange }) {
             background: "#fff",
           }}
         >
-          <div style={{ lineHeight: 1.25 }}>{it.label}</div>
+          <div style={{ lineHeight: 1.25, fontSize: 14 }}>{it.label}</div>
           <TextField
             placeholder="Initials"
             value={it.initials}
@@ -173,9 +177,19 @@ function ChecklistInitials({ items, onChange }) {
 }
 
 export default function App() {
-  // PO from URL (one-time read on load)
+  // Load Montserrat font
+  useEffect(() => {
+    const id = "qc-montserrat-font";
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.id = id;
+    link.rel = "stylesheet";
+    link.href = FONT_IMPORT_URL;
+    document.head.appendChild(link);
+  }, []);
+
+  // PO from URL + per-PO storage key
   const poFromUrl = useMemo(() => getPoFromUrl(), []);
-  // Different localStorage bucket per PO, so POs don't overwrite each other
   const storageKey = useMemo(
     () => `${STORAGE_KEY_PREFIX}:${poFromUrl || "NO_PO"}`,
     [poFromUrl]
@@ -183,7 +197,7 @@ export default function App() {
 
   const defaultData = useMemo(
     () => ({
-      header: { panelSerial: "", productionOrder: "" },
+      header: { productionOrder: "", panelSerial: "" },
 
       ip6: {
         date: "",
@@ -307,7 +321,7 @@ export default function App() {
     () => safeParse(localStorage.getItem(storageKey)) || defaultData
   );
 
-  // If URL included ?po=..., set it into header (once) and keep it locked
+  // If URL included ?po=..., set it once and lock input UI
   useEffect(() => {
     if (!poFromUrl) return;
     setData((p) => {
@@ -324,14 +338,14 @@ export default function App() {
     localStorage.setItem(storageKey, JSON.stringify(data));
   }, [data, storageKey]);
 
-  const panelSerial = data.header.panelSerial;
   const productionOrder = data.header.productionOrder;
-
-  const setPanelSerial = (v) =>
-    setData((p) => ({ ...p, header: { ...p.header, panelSerial: v } }));
+  const panelSerial = data.header.panelSerial;
 
   const setProductionOrder = (v) =>
     setData((p) => ({ ...p, header: { ...p.header, productionOrder: v } }));
+
+  const setPanelSerial = (v) =>
+    setData((p) => ({ ...p, header: { ...p.header, panelSerial: v } }));
 
   function setInitials(sectionKey, itemId, value) {
     setData((prev) => ({
@@ -502,25 +516,11 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url;
 
-    const po = (data.header.productionOrder || "").trim();
-    const ps = (data.header.panelSerial || "").trim();
+    const po = (productionOrder || "").trim();
+    const ps = (panelSerial || "").trim();
     a.download = `markup${po ? `_${po}` : ""}${ps ? `_${ps}` : ""}.png`;
 
     a.click();
-  }
-
-  function resetAll() {
-    // Reset only the current PO’s saved data (so other POs on this device aren't wiped)
-    localStorage.removeItem(storageKey);
-    setData(defaultData);
-
-    // If URL contains PO, put it back after reset
-    if (poFromUrl) {
-      setData((p) => ({
-        ...p,
-        header: { ...p.header, productionOrder: poFromUrl },
-      }));
-    }
   }
 
   const twoCol = {
@@ -535,20 +535,31 @@ export default function App() {
     gap: 14,
   };
 
+  const pageStyle = {
+    maxWidth: 1100,
+    margin: "0 auto",
+    padding: 16,
+    fontFamily:
+      '"Montserrat", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif',
+    background: "#fafafa",
+    minHeight: "100vh",
+  };
+
+  const contextChip = {
+    display: "inline-flex",
+    gap: 8,
+    alignItems: "center",
+    border: "1px solid #e7e7e7",
+    background: "#fff",
+    padding: "7px 10px",
+    borderRadius: 999,
+    fontSize: 13,
+  };
+
   return (
-    <div
-      style={{
-        maxWidth: 1100,
-        margin: "0 auto",
-        padding: 16,
-        fontFamily:
-          "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-        background: "#fafafa",
-        minHeight: "100vh",
-      }}
-    >
-      {/* HEADER (fixed true centered title) */}
-      <Card>
+    <div style={pageStyle}>
+      {/* HEADER */}
+      <Card style={{ padding: 16 }}>
         <div
           style={{
             position: "relative",
@@ -558,8 +569,7 @@ export default function App() {
             minHeight: 60,
           }}
         >
-          {/* Left: logo */}
-          <div style={{ display: "flex", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <img
               src={LOGO_URL}
               alt=""
@@ -567,7 +577,6 @@ export default function App() {
             />
           </div>
 
-          {/* True centered title */}
           <div
             style={{
               position: "absolute",
@@ -575,69 +584,94 @@ export default function App() {
               transform: "translateX(-50%)",
               fontSize: 26,
               fontWeight: 900,
+              color: BRAND,
               pointerEvents: "none",
+              letterSpacing: 0.2,
             }}
           >
             Quality Master
           </div>
 
-          {/* Right: actions */}
-          <div style={{ display: "flex", gap: 8 }}>
-            <Button onClick={resetAll}>Reset</Button>
-          </div>
+          {/* No Reset button (per request) */}
+          <div style={{ width: 1, height: 1 }} />
         </div>
 
-        {/* Production Order + Panel serial row */}
-        <div style={{ marginTop: 14, maxWidth: 520 }}>
-          <FieldLabel>Production Order</FieldLabel>
-          <TextField
-            value={productionOrder}
-            onChange={(e) => setProductionOrder(e.target.value)}
-            placeholder="Enter production order (or use a PO link)"
-            readOnly={!!poFromUrl} // lock if it came from URL
-          />
-          {!!poFromUrl && (
-            <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
-              PO is locked from link: <b>{poFromUrl}</b>
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginTop: 14, maxWidth: 520 }}>
-          <FieldLabel>Panel Serial</FieldLabel>
-          <TextField
-            value={panelSerial}
-            onChange={(e) => setPanelSerial(e.target.value)}
-            placeholder="Enter panel serial"
-          />
-        </div>
-      </Card>
-
-      <div style={{ height: 16 }} />
-
-      {/* IP6 */}
-      <Section title="Inspection Point 6 – Pre-Paint Line Inspection">
-        <div style={twoCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Date</FieldLabel>
+        {/* Key fields */}
+        <div
+          style={{
+            marginTop: 14,
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 12,
+            maxWidth: 760,
+          }}
+        >
+          <div>
+            <FieldLabel>Production Order</FieldLabel>
             <TextField
-              type="date"
-              value={data.ip6.date}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip6: { ...p.ip6, date: e.target.value },
-                }))
-              }
+              value={productionOrder}
+              onChange={(e) => setProductionOrder(e.target.value)}
+              placeholder="Use a PO link (?po=...) or enter here"
+              readOnly={!!poFromUrl}
             />
+            {!!poFromUrl && (
+              <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+                Locked from link: <b>{poFromUrl}</b>
+              </div>
+            )}
           </div>
-          <div style={{ minWidth: 0 }}>
+
+          <div>
             <FieldLabel>Panel Serial</FieldLabel>
             <TextField
               value={panelSerial}
               onChange={(e) => setPanelSerial(e.target.value)}
+              placeholder="Enter panel serial"
             />
           </div>
+        </div>
+      </Card>
+
+      {/* Sticky context bar */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "rgba(250,250,250,0.92)",
+          backdropFilter: "blur(6px)",
+          padding: "10px 0",
+          marginTop: 10,
+          marginBottom: 12,
+          borderBottom: "1px solid #eee",
+        }}
+      >
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <div style={contextChip}>
+            <span style={{ fontWeight: 900, color: BRAND }}>PO</span>
+            <span>{productionOrder || "—"}</span>
+          </div>
+          <div style={contextChip}>
+            <span style={{ fontWeight: 900, color: BRAND }}>Panel</span>
+            <span>{panelSerial || "—"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* IP6 */}
+      <Section title="Inspection Point 6" subtitle="Pre-Paint Line Inspection">
+        <div style={{ maxWidth: 320 }}>
+          <FieldLabel>Date</FieldLabel>
+          <TextField
+            type="date"
+            value={data.ip6.date}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                ip6: { ...p.ip6, date: e.target.value },
+              }))
+            }
+          />
         </div>
 
         <div style={{ height: 12 }} />
@@ -663,6 +697,7 @@ export default function App() {
               }
             />
           </div>
+
           <div style={{ minWidth: 0 }}>
             <FieldLabel>Notes</FieldLabel>
             <TextArea
@@ -679,28 +714,22 @@ export default function App() {
       </Section>
 
       {/* IP8 */}
-      <Section title="Inspection Point 8 – Post-Paint Inspection (Coraflon)">
-        <div style={twoCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Date</FieldLabel>
-            <TextField
-              type="date"
-              value={data.ip8.date}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  ip8: { ...p.ip8, date: e.target.value },
-                }))
-              }
-            />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Panel Serial</FieldLabel>
-            <TextField
-              value={panelSerial}
-              onChange={(e) => setPanelSerial(e.target.value)}
-            />
-          </div>
+      <Section
+        title="Inspection Point 8"
+        subtitle="Post-Paint Inspection (Coraflon)"
+      >
+        <div style={{ maxWidth: 320 }}>
+          <FieldLabel>Date</FieldLabel>
+          <TextField
+            type="date"
+            value={data.ip8.date}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                ip8: { ...p.ip8, date: e.target.value },
+              }))
+            }
+          />
         </div>
 
         <div style={{ height: 12 }} />
@@ -729,6 +758,7 @@ export default function App() {
               }
             />
           </div>
+
           <div style={{ minWidth: 0 }}>
             <FieldLabel>Notes</FieldLabel>
             <TextArea
@@ -746,27 +776,18 @@ export default function App() {
 
       {/* Visual */}
       <Section title="Visual Inspection Guide">
-        <div style={twoCol}>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Date</FieldLabel>
-            <TextField
-              type="date"
-              value={data.visual.date}
-              onChange={(e) =>
-                setData((p) => ({
-                  ...p,
-                  visual: { ...p.visual, date: e.target.value },
-                }))
-              }
-            />
-          </div>
-          <div style={{ minWidth: 0 }}>
-            <FieldLabel>Panel Serial</FieldLabel>
-            <TextField
-              value={panelSerial}
-              onChange={(e) => setPanelSerial(e.target.value)}
-            />
-          </div>
+        <div style={{ maxWidth: 320 }}>
+          <FieldLabel>Date</FieldLabel>
+          <TextField
+            type="date"
+            value={data.visual.date}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                visual: { ...p.visual, date: e.target.value },
+              }))
+            }
+          />
         </div>
 
         <div style={{ height: 12 }} />
@@ -843,207 +864,206 @@ export default function App() {
             }))
           }
         />
+      </Section>
 
-        {/* Markup */}
-        <div style={{ height: 16 }} />
-        <div style={{ fontSize: 16, fontWeight: 900, marginBottom: 10 }}>
-          Markup
-        </div>
-
-        <div style={{ display: "grid", gap: 10 }}>
-          <Card>
-            <div style={{ fontWeight: 900, marginBottom: 8 }}>Color Legend</div>
-
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-                alignItems: "center",
-              }}
-            >
-              {LEGEND.map((l) => {
-                const active =
-                  data.markup.legendKey === l.key &&
-                  data.markup.tool !== "ERASER";
-                return (
-                  <button
-                    key={l.key}
-                    type="button"
-                    onClick={() =>
-                      setData((p) => ({
-                        ...p,
-                        markup: { ...p.markup, tool: "PEN", legendKey: l.key },
-                      }))
-                    }
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      alignItems: "center",
-                      padding: "7px 10px",
-                      borderRadius: 999,
-                      border: active ? "2px solid #111" : "1px solid #d7d7d7",
-                      background: "#fff",
-                      cursor: "pointer",
-                      fontSize: 13,
-                      fontWeight: 800,
-                    }}
-                  >
-                    <span
-                      style={{
-                        width: 14,
-                        height: 14,
-                        borderRadius: 4,
-                        background: l.color,
-                        border: "1px solid rgba(0,0,0,0.2)",
-                        display: "inline-block",
-                      }}
-                    />
-                    <span>{l.label}</span>
-                  </button>
-                );
-              })}
-
-              <button
-                type="button"
-                onClick={() =>
-                  setData((p) => ({
-                    ...p,
-                    markup: { ...p.markup, tool: "ERASER" },
-                  }))
-                }
-                style={{
-                  padding: "7px 10px",
-                  borderRadius: 999,
-                  border:
-                    data.markup.tool === "ERASER"
-                      ? "2px solid #111"
-                      : "1px solid #d7d7d7",
-                  background: "#fff",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: 900,
-                }}
-              >
-                Eraser
-              </button>
-
-              <label
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  alignItems: "center",
-                  marginLeft: 6,
-                }}
-              >
-                <span style={{ fontWeight: 900 }}>Brush</span>
-                <input
-                  type="range"
-                  min={2}
-                  max={30}
-                  value={data.markup.brushSize}
-                  onChange={(e) =>
-                    setData((p) => ({
-                      ...p,
-                      markup: {
-                        ...p.markup,
-                        brushSize: Number(e.target.value),
-                      },
-                    }))
-                  }
-                />
-                <span
-                  style={{ width: 52, textAlign: "right", fontWeight: 800 }}
-                >
-                  {data.markup.brushSize}px
-                </span>
-              </label>
-            </div>
-          </Card>
+      {/* Markup */}
+      <Section title="Markup" subtitle="Annotate on top of an uploaded image">
+        <Card style={{ padding: 14, marginBottom: 12 }}>
+          <div style={{ fontWeight: 900, marginBottom: 8, color: BRAND }}>
+            Color Legend
+          </div>
 
           <div
             style={{
               display: "flex",
-              gap: 10,
               flexWrap: "wrap",
+              gap: 8,
               alignItems: "center",
             }}
           >
-            <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <span style={{ fontWeight: 900 }}>Upload image</span>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () =>
+            {LEGEND.map((l) => {
+              const active =
+                data.markup.legendKey === l.key &&
+                data.markup.tool !== "ERASER";
+              return (
+                <button
+                  key={l.key}
+                  type="button"
+                  onClick={() =>
                     setData((p) => ({
                       ...p,
-                      markup: {
-                        ...p.markup,
-                        backgroundImageDataUrl: String(reader.result || ""),
-                      },
-                    }));
-                  reader.readAsDataURL(file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
+                      markup: { ...p.markup, tool: "PEN", legendKey: l.key },
+                    }))
+                  }
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    alignItems: "center",
+                    padding: "7px 10px",
+                    borderRadius: 999,
+                    border: active ? `2px solid ${BRAND}` : "1px solid #d7d7d7",
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 800,
+                  }}
+                >
+                  <span
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: 4,
+                      background: l.color,
+                      border: "1px solid rgba(0,0,0,0.2)",
+                      display: "inline-block",
+                    }}
+                  />
+                  <span>{l.label}</span>
+                </button>
+              );
+            })}
 
-            <Button onClick={clearDrawingOnly}>Clear Drawing</Button>
-            <Button onClick={clearBackgroundAndDrawing}>
-              Clear Background
-            </Button>
-            <Button onClick={saveDrawingToState}>Save Drawing</Button>
-            <Button onClick={exportFlattenedPng}>Download PNG</Button>
-          </div>
-
-          <Card>
-            <div
+            <button
+              type="button"
+              onClick={() =>
+                setData((p) => ({
+                  ...p,
+                  markup: { ...p.markup, tool: "ERASER" },
+                }))
+              }
               style={{
-                border: "1px solid #e6e6e6",
-                borderRadius: 12,
-                overflow: "hidden",
+                padding: "7px 10px",
+                borderRadius: 999,
+                border:
+                  data.markup.tool === "ERASER"
+                    ? `2px solid ${BRAND}`
+                    : "1px solid #d7d7d7",
+                background: "#fff",
+                cursor: "pointer",
+                fontSize: 13,
+                fontWeight: 900,
               }}
             >
-              <div
-                style={{
-                  position: "relative",
-                  width: "100%",
-                  background: "#fff",
-                }}
-              >
-                <canvas
-                  ref={bgCanvasRef}
-                  width={900}
-                  height={450}
-                  style={{ width: "100%", height: "auto", display: "block" }}
-                />
-                <canvas
-                  ref={drawCanvasRef}
-                  width={900}
-                  height={450}
-                  style={{
-                    position: "absolute",
-                    left: 0,
-                    top: 0,
-                    width: "100%",
-                    height: "auto",
-                    display: "block",
-                    touchAction: "none",
-                  }}
-                  onPointerDown={onPointerDown}
-                  onPointerMove={onPointerMove}
-                  onPointerUp={onPointerUp}
-                  onPointerCancel={onPointerUp}
-                  onPointerLeave={onPointerUp}
-                />
-              </div>
-            </div>
-          </Card>
+              Eraser
+            </button>
+
+            <label
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                marginLeft: 6,
+              }}
+            >
+              <span style={{ fontWeight: 900, color: BRAND }}>Brush</span>
+              <input
+                type="range"
+                min={2}
+                max={30}
+                value={data.markup.brushSize}
+                onChange={(e) =>
+                  setData((p) => ({
+                    ...p,
+                    markup: {
+                      ...p.markup,
+                      brushSize: Number(e.target.value),
+                    },
+                  }))
+                }
+              />
+              <span style={{ width: 52, textAlign: "right", fontWeight: 800 }}>
+                {data.markup.brushSize}px
+              </span>
+            </label>
+          </div>
+        </Card>
+
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            flexWrap: "wrap",
+            alignItems: "center",
+            marginBottom: 12,
+          }}
+        >
+          <label style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <span style={{ fontWeight: 900, color: BRAND }}>Upload image</span>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = () =>
+                  setData((p) => ({
+                    ...p,
+                    markup: {
+                      ...p.markup,
+                      backgroundImageDataUrl: String(reader.result || ""),
+                    },
+                  }));
+                reader.readAsDataURL(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+
+          <Button onClick={clearDrawingOnly}>Clear Drawing</Button>
+          <Button onClick={clearBackgroundAndDrawing}>Clear Background</Button>
+          <Button onClick={saveDrawingToState}>Save Drawing</Button>
+          <Button
+            onClick={exportFlattenedPng}
+            style={{ borderColor: BRAND, color: BRAND }}
+          >
+            Download PNG
+          </Button>
         </div>
+
+        <Card style={{ padding: 0 }}>
+          <div
+            style={{
+              border: "1px solid #e6e6e6",
+              borderRadius: 14,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                background: "#fff",
+              }}
+            >
+              <canvas
+                ref={bgCanvasRef}
+                width={900}
+                height={450}
+                style={{ width: "100%", height: "auto", display: "block" }}
+              />
+              <canvas
+                ref={drawCanvasRef}
+                width={900}
+                height={450}
+                style={{
+                  position: "absolute",
+                  left: 0,
+                  top: 0,
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  touchAction: "none",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerCancel={onPointerUp}
+                onPointerLeave={onPointerUp}
+              />
+            </div>
+          </div>
+        </Card>
       </Section>
 
       <div style={{ height: 24 }} />
