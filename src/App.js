@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY = "quality-master-live-form:v10";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v10";
 
 // Hosted logo URL (stable)
 const LOGO_URL =
@@ -34,6 +34,17 @@ function safeParse(raw) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Best-practice PO handling:
+ * - Read PO from URL query param: ?po=10001
+ * - Use a PER-PO localStorage key so different POs don't overwrite each other on the same device
+ * - Lock PO field (readOnly) when it comes from the URL to avoid accidental wrong PO
+ */
+function getPoFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get("po") || "").trim();
 }
 
 // ---------------- UI primitives ----------------
@@ -162,9 +173,17 @@ function ChecklistInitials({ items, onChange }) {
 }
 
 export default function App() {
+  // PO from URL (one-time read on load)
+  const poFromUrl = useMemo(() => getPoFromUrl(), []);
+  // Different localStorage bucket per PO, so POs don't overwrite each other
+  const storageKey = useMemo(
+    () => `${STORAGE_KEY_PREFIX}:${poFromUrl || "NO_PO"}`,
+    [poFromUrl]
+  );
+
   const defaultData = useMemo(
     () => ({
-      header: { panelSerial: "" },
+      header: { panelSerial: "", productionOrder: "" },
 
       ip6: {
         date: "",
@@ -285,16 +304,34 @@ export default function App() {
   );
 
   const [data, setData] = useState(
-    () => safeParse(localStorage.getItem(STORAGE_KEY)) || defaultData
+    () => safeParse(localStorage.getItem(storageKey)) || defaultData
   );
 
+  // If URL included ?po=..., set it into header (once) and keep it locked
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
+    if (!poFromUrl) return;
+    setData((p) => {
+      if (p.header?.productionOrder) return p;
+      return {
+        ...p,
+        header: { ...p.header, productionOrder: poFromUrl },
+      };
+    });
+  }, [poFromUrl]);
+
+  // Persist per-PO
+  useEffect(() => {
+    localStorage.setItem(storageKey, JSON.stringify(data));
+  }, [data, storageKey]);
 
   const panelSerial = data.header.panelSerial;
+  const productionOrder = data.header.productionOrder;
+
   const setPanelSerial = (v) =>
     setData((p) => ({ ...p, header: { ...p.header, panelSerial: v } }));
+
+  const setProductionOrder = (v) =>
+    setData((p) => ({ ...p, header: { ...p.header, productionOrder: v } }));
 
   function setInitials(sectionKey, itemId, value) {
     setData((prev) => ({
@@ -464,13 +501,26 @@ export default function App() {
     const url = out.toDataURL("image/png");
     const a = document.createElement("a");
     a.href = url;
-    a.download = `markup${panelSerial ? `_${panelSerial}` : ""}.png`;
+
+    const po = (data.header.productionOrder || "").trim();
+    const ps = (data.header.panelSerial || "").trim();
+    a.download = `markup${po ? `_${po}` : ""}${ps ? `_${ps}` : ""}.png`;
+
     a.click();
   }
 
   function resetAll() {
-    localStorage.removeItem(STORAGE_KEY);
+    // Reset only the current PO’s saved data (so other POs on this device aren't wiped)
+    localStorage.removeItem(storageKey);
     setData(defaultData);
+
+    // If URL contains PO, put it back after reset
+    if (poFromUrl) {
+      setData((p) => ({
+        ...p,
+        header: { ...p.header, productionOrder: poFromUrl },
+      }));
+    }
   }
 
   const twoCol = {
@@ -537,7 +587,22 @@ export default function App() {
           </div>
         </div>
 
-        {/* Panel serial row */}
+        {/* Production Order + Panel serial row */}
+        <div style={{ marginTop: 14, maxWidth: 520 }}>
+          <FieldLabel>Production Order</FieldLabel>
+          <TextField
+            value={productionOrder}
+            onChange={(e) => setProductionOrder(e.target.value)}
+            placeholder="Enter production order (or use a PO link)"
+            readOnly={!!poFromUrl} // lock if it came from URL
+          />
+          {!!poFromUrl && (
+            <div style={{ fontSize: 12, color: "#666", marginTop: 6 }}>
+              PO is locked from link: <b>{poFromUrl}</b>
+            </div>
+          )}
+        </div>
+
         <div style={{ marginTop: 14, maxWidth: 520 }}>
           <FieldLabel>Panel Serial</FieldLabel>
           <TextField
