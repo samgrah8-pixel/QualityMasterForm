@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY_PREFIX = "quality-master-live-form:v13";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v15";
 
 // Branding
 const BRAND = "#2cb889";
 const BLACK = "#111";
 const FONT_IMPORT_URL =
-  "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800;900&display=swap";
+  "https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap";
 
 // Hosted logo URL (stable)
 const LOGO_URL =
@@ -14,10 +14,14 @@ const LOGO_URL =
 
 const LOGO_HEIGHT_PX = 55;
 
+// Canvas size
+const CANVAS_W = 900;
+const CANVAS_H = 450;
+
 // Markup legend/colors
 const LEGEND = [
-  { key: "HIGH", label: "High", color: "#ff4da6" }, // pink
-  { key: "LOW", label: "Low", color: "#ffd400" }, // yellow
+  { key: "HIGH", label: "High", color: "#ff4da6" },
+  { key: "LOW", label: "Low", color: "#ffd400" },
   { key: "SAND", label: "Needs sanding", color: "#1f77b4" },
   { key: "BONDO", label: "Needs bondo", color: "#ff7f0e" },
   { key: "OTHER", label: "Other", color: "#2ca02c" },
@@ -38,7 +42,6 @@ function safeParse(raw) {
   }
 }
 
-// PO from URL: ?po=10001
 function getPoFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return (params.get("po") || "").trim();
@@ -254,7 +257,7 @@ function StepPills({ current, onGo }) {
 }
 
 export default function App() {
-  // Load Montserrat + global safety CSS so NOTHING falls back
+  // Load Montserrat + global safety CSS
   useEffect(() => {
     const id = "qc-montserrat-font";
     if (!document.getElementById(id)) {
@@ -287,7 +290,7 @@ export default function App() {
   const defaultData = useMemo(
     () => ({
       header: { productionOrder: "", panelSerial: "" },
-      nav: { step: 0 }, // 0=IP6, 1=IP8, 2=Visual
+      nav: { step: 0 },
 
       ip6: {
         date: "",
@@ -420,9 +423,15 @@ export default function App() {
     });
   }, [poFromUrl]);
 
-  // Persist per-PO
+  // Persist per-PO (safe)
+  const [storageWarning, setStorageWarning] = useState(false);
   useEffect(() => {
-    localStorage.setItem(storageKey, JSON.stringify(data));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(data));
+      setStorageWarning(false);
+    } catch (e) {
+      setStorageWarning(true);
+    }
   }, [data, storageKey]);
 
   const productionOrder = data.header.productionOrder;
@@ -448,13 +457,29 @@ export default function App() {
     }));
   }
 
-  // ---------- Markup (two-layer canvas) ----------
+  // Click-to-green buttons
+  const [activeAction, setActiveAction] = useState(null);
+  const flashAction = (key) => {
+    setActiveAction(key);
+    window.setTimeout(() => {
+      setActiveAction((cur) => (cur === key ? null : cur));
+    }, 250);
+  };
+  const actionStyle = (key) => {
+    const active = activeAction === key;
+    return {
+      borderColor: active ? BRAND : "#d7d7d7",
+      background: active ? "rgba(44,184,137,0.10)" : "#fff",
+      color: BLACK,
+    };
+  };
+
+  // ---------- Markup ----------
   const bgCanvasRef = useRef(null);
   const drawCanvasRef = useRef(null);
   const isDrawingRef = useRef(false);
   const lastRef = useRef(null);
 
-  // NEW: autosave drawing while drawing (debounced)
   const saveTimerRef = useRef(null);
   const scheduleAutoSave = () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -475,21 +500,23 @@ export default function App() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const cw = canvas.width,
-      ch = canvas.height;
-    ctx.clearRect(0, 0, cw, ch);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     if (!data.markup.backgroundImageDataUrl) return;
 
     const img = new Image();
     img.onload = () => {
-      const iw = img.width,
-        ih = img.height;
+      const cw = canvas.width;
+      const ch = canvas.height;
+
+      const iw = img.width;
+      const ih = img.height;
       const scale = Math.min(cw / iw, ch / ih);
-      const w = iw * scale,
-        h = ih * scale;
-      const x = (cw - w) / 2,
-        y = (ch - h) / 2;
+      const w = iw * scale;
+      const h = ih * scale;
+      const x = (cw - w) / 2;
+      const y = (ch - h) / 2;
+
       ctx.clearRect(0, 0, cw, ch);
       ctx.drawImage(img, x, y, w, h);
     };
@@ -568,8 +595,6 @@ export default function App() {
     const next = getPoint(e, canvas);
     drawLine(lastRef.current, next);
     lastRef.current = next;
-
-    // NEW: auto-save while drawing
     scheduleAutoSave();
   }
 
@@ -578,7 +603,6 @@ export default function App() {
     isDrawingRef.current = false;
     lastRef.current = null;
 
-    // Flush any pending autosave + save immediately
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     saveTimerRef.current = null;
     saveDrawingToState();
@@ -634,8 +658,48 @@ export default function App() {
     const po = (productionOrder || "").trim();
     const ps = (panelSerial || "").trim();
     a.download = `markup${po ? `_${po}` : ""}${ps ? `_${ps}` : ""}.png`;
-
     a.click();
+  }
+
+  async function handleUploadImage(file) {
+    if (!file) return;
+
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const img = await new Promise((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = reject;
+      i.src = dataUrl;
+    });
+
+    const off = document.createElement("canvas");
+    off.width = CANVAS_W;
+    off.height = CANVAS_H;
+
+    const ctx = off.getContext("2d");
+    if (!ctx) return;
+
+    const scale = Math.min(off.width / img.width, off.height / img.height);
+    const w = img.width * scale;
+    const h = img.height * scale;
+    const x = (off.width - w) / 2;
+    const y = (off.height - h) / 2;
+
+    ctx.clearRect(0, 0, off.width, off.height);
+    ctx.drawImage(img, x, y, w, h);
+
+    const compressed = off.toDataURL("image/jpeg", 0.85);
+
+    setData((p) => ({
+      ...p,
+      markup: { ...p.markup, backgroundImageDataUrl: compressed },
+    }));
   }
 
   const pageStyle = {
@@ -674,139 +738,137 @@ export default function App() {
     gap: 14,
   };
 
-  // --- Page content by step ---
-  const StepContent = () => {
-    if (step === 0) {
-      return (
-        <Card>
-          <SectionHeader
-            title="Inspection Point 6"
-            subtitle="Pre-Paint Line Inspection"
-          />
+  // Step view (NOT a nested component)
+  let stepView = null;
 
-          <div style={{ maxWidth: 320 }}>
-            <FieldLabel>Date</FieldLabel>
+  if (step === 0) {
+    stepView = (
+      <Card>
+        <SectionHeader
+          title="Inspection Point 6"
+          subtitle="Pre-Paint Line Inspection"
+        />
+
+        <div style={{ maxWidth: 320 }}>
+          <FieldLabel>Date</FieldLabel>
+          <TextField
+            type="date"
+            value={data.ip6.date}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                ip6: { ...p.ip6, date: e.target.value },
+              }))
+            }
+          />
+        </div>
+
+        <div style={{ height: 12 }} />
+
+        <ChecklistInitials
+          items={data.ip6.items}
+          onChange={(id, v) => setInitials("ip6", id, v)}
+        />
+
+        <div style={{ height: 12 }} />
+
+        <div style={twoCol}>
+          <div style={{ minWidth: 0 }}>
+            <FieldLabel>Ready for Primer</FieldLabel>
             <TextField
-              type="date"
-              value={data.ip6.date}
+              placeholder="Initials"
+              value={data.ip6.readyForPrimerInitials}
+              onChange={(e) => {
+                const v = e.target.value;
+                setData((p) => ({
+                  ...p,
+                  ip6: { ...p.ip6, readyForPrimerInitials: v },
+                  visual: { ...p.visual, approvedForPrimerInitials: v },
+                }));
+              }}
+            />
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <FieldLabel>Notes</FieldLabel>
+            <TextArea
+              value={data.ip6.notes}
               onChange={(e) =>
                 setData((p) => ({
                   ...p,
-                  ip6: { ...p.ip6, date: e.target.value },
+                  ip6: { ...p.ip6, notes: e.target.value },
                 }))
               }
             />
           </div>
+        </div>
+      </Card>
+    );
+  } else if (step === 1) {
+    stepView = (
+      <Card>
+        <SectionHeader
+          title="Inspection Point 8"
+          subtitle="Post-Paint Inspection (Coraflon)"
+        />
 
-          <div style={{ height: 12 }} />
-
-          <ChecklistInitials
-            items={data.ip6.items}
-            onChange={(id, v) => setInitials("ip6", id, v)}
+        <div style={{ maxWidth: 320 }}>
+          <FieldLabel>Date</FieldLabel>
+          <TextField
+            type="date"
+            value={data.ip8.date}
+            onChange={(e) =>
+              setData((p) => ({
+                ...p,
+                ip8: { ...p.ip8, date: e.target.value },
+              }))
+            }
           />
+        </div>
 
-          <div style={{ height: 12 }} />
+        <div style={{ height: 12 }} />
 
-          <div style={twoCol}>
-            <div style={{ minWidth: 0 }}>
-              <FieldLabel>Ready for Primer</FieldLabel>
-              <TextField
-                placeholder="Initials"
-                value={data.ip6.readyForPrimerInitials}
-                onChange={(e) =>
-                  setData((p) => ({
-                    ...p,
-                    ip6: { ...p.ip6, readyForPrimerInitials: e.target.value },
-                  }))
-                }
-              />
-            </div>
+        <ChecklistInitials
+          items={data.ip8.items}
+          onChange={(id, v) => setInitials("ip8", id, v)}
+        />
 
-            <div style={{ minWidth: 0 }}>
-              <FieldLabel>Notes</FieldLabel>
-              <TextArea
-                value={data.ip6.notes}
-                onChange={(e) =>
-                  setData((p) => ({
-                    ...p,
-                    ip6: { ...p.ip6, notes: e.target.value },
-                  }))
-                }
-              />
-            </div>
-          </div>
-        </Card>
-      );
-    }
+        <div style={{ height: 12 }} />
 
-    if (step === 1) {
-      return (
-        <Card>
-          <SectionHeader
-            title="Inspection Point 8"
-            subtitle="Post-Paint Inspection (Coraflon)"
-          />
-
-          <div style={{ maxWidth: 320 }}>
-            <FieldLabel>Date</FieldLabel>
+        <div style={twoCol}>
+          <div style={{ minWidth: 0 }}>
+            <FieldLabel>Remove from the Paintline</FieldLabel>
             <TextField
-              type="date"
-              value={data.ip8.date}
+              placeholder="Initials"
+              value={data.ip8.removeFromPaintlineInitials}
+              onChange={(e) => {
+                const v = e.target.value;
+                setData((p) => ({
+                  ...p,
+                  ip8: { ...p.ip8, removeFromPaintlineInitials: v },
+                  visual: { ...p.visual, qcFinalApprovalInitials: v },
+                }));
+              }}
+            />
+          </div>
+
+          <div style={{ minWidth: 0 }}>
+            <FieldLabel>Notes</FieldLabel>
+            <TextArea
+              value={data.ip8.notes}
               onChange={(e) =>
                 setData((p) => ({
                   ...p,
-                  ip8: { ...p.ip8, date: e.target.value },
+                  ip8: { ...p.ip8, notes: e.target.value },
                 }))
               }
             />
           </div>
-
-          <div style={{ height: 12 }} />
-
-          <ChecklistInitials
-            items={data.ip8.items}
-            onChange={(id, v) => setInitials("ip8", id, v)}
-          />
-
-          <div style={{ height: 12 }} />
-
-          <div style={twoCol}>
-            <div style={{ minWidth: 0 }}>
-              <FieldLabel>Remove from the Paintline</FieldLabel>
-              <TextField
-                placeholder="Initials"
-                value={data.ip8.removeFromPaintlineInitials}
-                onChange={(e) =>
-                  setData((p) => ({
-                    ...p,
-                    ip8: {
-                      ...p.ip8,
-                      removeFromPaintlineInitials: e.target.value,
-                    },
-                  }))
-                }
-              />
-            </div>
-
-            <div style={{ minWidth: 0 }}>
-              <FieldLabel>Notes</FieldLabel>
-              <TextArea
-                value={data.ip8.notes}
-                onChange={(e) =>
-                  setData((p) => ({
-                    ...p,
-                    ip8: { ...p.ip8, notes: e.target.value },
-                  }))
-                }
-              />
-            </div>
-          </div>
-        </Card>
-      );
-    }
-
-    // step === 2
-    return (
+        </div>
+      </Card>
+    );
+  } else {
+    stepView = (
       <div style={{ display: "grid", gap: 16 }}>
         <Card>
           <SectionHeader title="Visual Inspection Guide" />
@@ -901,18 +963,10 @@ export default function App() {
           />
         </Card>
 
-        {/* Markup */}
         <Card>
           <SectionHeader title="Markup" subtitle="" />
 
-          <div
-            style={{
-              fontWeight: 500,
-              marginBottom: 8,
-              color: BLACK,
-              fontFamily: "inherit",
-            }}
-          >
+          <div style={{ fontWeight: 500, marginBottom: 8, color: BLACK }}>
             Color Legend
           </div>
 
@@ -998,14 +1052,7 @@ export default function App() {
               Eraser
             </button>
 
-            <label
-              style={{
-                display: "flex",
-                gap: 8,
-                alignItems: "center",
-                fontFamily: "inherit",
-              }}
-            >
+            <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <span style={{ fontWeight: 500, color: BLACK }}>Brush</span>
               <input
                 type="range"
@@ -1041,35 +1088,51 @@ export default function App() {
               <input
                 type="file"
                 accept="image/*"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () =>
-                    setData((p) => ({
-                      ...p,
-                      markup: {
-                        ...p.markup,
-                        backgroundImageDataUrl: String(reader.result || ""),
-                      },
-                    }));
-                  reader.readAsDataURL(file);
                   e.target.value = "";
+                  if (!file) return;
+                  await handleUploadImage(file);
                 }}
               />
             </label>
 
-            <Button onClick={clearDrawingOnly}>Clear Drawing</Button>
-            <Button onClick={clearBackgroundAndDrawing}>
+            <Button
+              onClick={() => {
+                flashAction("clearDrawing");
+                clearDrawingOnly();
+              }}
+              style={actionStyle("clearDrawing")}
+            >
+              Clear Drawing
+            </Button>
+
+            <Button
+              onClick={() => {
+                flashAction("clearBg");
+                clearBackgroundAndDrawing();
+              }}
+              style={actionStyle("clearBg")}
+            >
               Clear Background
             </Button>
 
-            {/* Save button still available (optional), but autosave now works */}
-            <Button onClick={saveDrawingToState}>Save Drawing</Button>
+            <Button
+              onClick={() => {
+                flashAction("save");
+                saveDrawingToState();
+              }}
+              style={actionStyle("save")}
+            >
+              Save Drawing
+            </Button>
 
             <Button
-              onClick={exportFlattenedPng}
-              style={{ borderColor: BRAND, color: BRAND }}
+              onClick={() => {
+                flashAction("download");
+                exportFlattenedPng();
+              }}
+              style={actionStyle("download")}
             >
               Download PNG
             </Button>
@@ -1091,14 +1154,14 @@ export default function App() {
             >
               <canvas
                 ref={bgCanvasRef}
-                width={900}
-                height={450}
+                width={CANVAS_W}
+                height={CANVAS_H}
                 style={{ width: "100%", height: "auto", display: "block" }}
               />
               <canvas
                 ref={drawCanvasRef}
-                width={900}
-                height={450}
+                width={CANVAS_W}
+                height={CANVAS_H}
                 style={{
                   position: "absolute",
                   left: 0,
@@ -1117,53 +1180,55 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ fontSize: 12, color: "BLACK", marginTop: 10 }}>
+          <div style={{ fontSize: 12, color: BLACK, marginTop: 10 }}>
             Auto-save is enabled
           </div>
+
+          {storageWarning && (
+            <div style={{ fontSize: 12, color: "#b00020", marginTop: 8 }}>
+              Storage warning: uploaded image may be too large to save
+              permanently. (This version compresses uploads—try uploading again
+              if it still disappears.)
+            </div>
+          )}
         </Card>
       </div>
     );
-  };
+  }
 
   return (
     <div style={pageStyle}>
       {/* HEADER */}
       <Card style={{ padding: 16 }}>
+        {/* Logo row: LEFT */}
         <div
           style={{
-            position: "relative",
             display: "flex",
             alignItems: "center",
-            justifyContent: "space-between",
-            minHeight: 60,
+            justifyContent: "flex-start",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <img
-              src={LOGO_URL}
-              alt=""
-              style={{ height: LOGO_HEIGHT_PX, objectFit: "contain" }}
-            />
-          </div>
+          <img
+            src={LOGO_URL}
+            alt=""
+            style={{ height: LOGO_HEIGHT_PX, objectFit: "contain" }}
+          />
+        </div>
 
-          {/* Quality Master: black + Montserrat */}
-          <div
-            style={{
-              position: "absolute",
-              left: "50%",
-              transform: "translateX(-50%)",
-              fontSize: 23,
-              fontWeight: 500,
-              color: BLACK,
-              pointerEvents: "none",
-              letterSpacing: 0.2,
-              fontFamily: "inherit",
-            }}
-          >
-            QUALITY FORM
-          </div>
-
-          <div style={{ width: 1, height: 1 }} />
+        {/* Title row: centered under the header area */}
+        <div
+          style={{
+            width: "100%",
+            textAlign: "center",
+            fontSize: 23,
+            fontWeight: 500,
+            color: BLACK,
+            letterSpacing: 0.2,
+            fontFamily: "inherit",
+            marginTop: 8,
+          }}
+        >
+          QUALITY FORM
         </div>
 
         {/* Key fields */}
@@ -1185,7 +1250,7 @@ export default function App() {
               readOnly={!!poFromUrl}
             />
             {!!poFromUrl && (
-              <div style={{ fontSize: 12, color: "BLACK", marginTop: 6 }}>
+              <div style={{ fontSize: 12, color: BLACK, marginTop: 6 }}>
                 Locked from link: <b>{poFromUrl}</b>
               </div>
             )}
@@ -1236,12 +1301,12 @@ export default function App() {
             </div>
           </div>
 
-          <StepPills current={step} onGo={goStep} />
+          <StepPills current={step} onGo={(s) => goStep(s)} />
         </div>
       </div>
 
       {/* Step content */}
-      <StepContent />
+      {stepView}
 
       {/* Bottom navigation */}
       <div style={{ height: 14 }} />
