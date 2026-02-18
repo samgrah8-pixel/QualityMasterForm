@@ -497,14 +497,15 @@ export default function App() {
         minHeight: "100vh",
       }}
     >
-      {/* HEADER (true centered title) */}
+      {/* HEADER (fixed true centered title) */}
       <Card>
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "auto 1fr auto",
+            position: "relative",
+            display: "flex",
             alignItems: "center",
-            gap: 12,
+            justifyContent: "space-between",
+            minHeight: 60,
           }}
         >
           {/* Left: logo */}
@@ -516,15 +517,22 @@ export default function App() {
             />
           </div>
 
-          {/* Center: title */}
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 26, fontWeight: 900, margin: 0 }}>
-              Quality Master
-            </div>
+          {/* True centered title */}
+          <div
+            style={{
+              position: "absolute",
+              left: "50%",
+              transform: "translateX(-50%)",
+              fontSize: 26,
+              fontWeight: 900,
+              pointerEvents: "none",
+            }}
+          >
+            Quality Master
           </div>
 
-          {/* Right: actions (UPDATED: Export JSON removed) */}
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          {/* Right: actions */}
+          <div style={{ display: "flex", gap: 8 }}>
             <Button onClick={resetAll}>Reset</Button>
           </div>
         </div>
