@@ -36,18 +36,6 @@ function safeParse(raw) {
   }
 }
 
-function downloadJson(filename, data) {
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
-  });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 // ---------------- UI primitives ----------------
 function Card({ children }) {
   return (
@@ -535,11 +523,8 @@ export default function App() {
             </div>
           </div>
 
-          {/* Right: actions */}
+          {/* Right: actions (UPDATED: Export JSON removed) */}
           <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <Button onClick={() => downloadJson("quality-master.json", data)}>
-              Export JSON
-            </Button>
             <Button onClick={resetAll}>Reset</Button>
           </div>
         </div>
