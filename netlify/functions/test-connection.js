@@ -1,46 +1,66 @@
-import { createClient } from "@supabase/supabase-js";
+const { createClient } = require("@supabase/supabase-js");
 
-export const handler = async () => {
+exports.handler = async (event) => {
   try {
-    const url = process.env.SUPABASE_URL;
-    const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (event.httpMethod !== "POST") {
+      return {
+        statusCode: 405,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ success: false, error: "Use POST" }),
+      };
+    }
 
-    if (!url || !serviceRole) {
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       return {
         statusCode: 500,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           success: false,
-          error:
-            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables",
+          error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
         }),
       };
     }
 
-    const supabase = createClient(url, serviceRole);
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // simplest DB check: run a lightweight query
-    const { data, error } = await supabase
+    const body = JSON.parse(event.body || "{}");
+    const serial = String(body.serial || "").trim();
+    const data = body.data ?? null;
+
+    if (!serial) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ success: false, error: "serial is required" }),
+      };
+    }
+    if (!data) {
+      return {
+        statusCode: 400,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ success: false, error: "data is required" }),
+      };
+    }
+
+    const { error } = await supabase
       .from("quality_forms")
-      .select("*")
-      .limit(1);
+      .upsert({ serial, data }, { onConflict: "serial" });
 
     if (error) throw error;
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        message: "Supabase connected",
-        data,
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ success: true }),
     };
   } catch (err) {
     return {
       statusCode: 500,
-      body: JSON.stringify({
-        success: false,
-        error: err?.message || String(err),
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ success: false, error: err.message }),
     };
   }
 };
