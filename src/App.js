@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY_PREFIX = "quality-master-live-form:v16";
-const RECENT_PO_KEY = "quality-master:recent-pos";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v17";
+const RECENT_SERIAL_KEY = "quality-master:recent-serials";
 
 // Branding
 const BRAND = "#2cb889";
@@ -43,34 +43,35 @@ function safeParse(raw) {
   }
 }
 
-function getPoFromUrl() {
+// Serial from URL: ?serial=ABC123
+function getSerialFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  return (params.get("po") || "").trim();
+  return (params.get("serial") || "").trim();
 }
 
-function sanitizePo(input) {
+function sanitizeValue(input) {
   return String(input || "").trim();
 }
 
-function goToPo(po) {
-  const clean = sanitizePo(po);
+function goToSerial(serial) {
+  const clean = sanitizeValue(serial);
   if (!clean) return;
-  const url = `/?po=${encodeURIComponent(clean)}`;
+  const url = `/?serial=${encodeURIComponent(clean)}`;
   window.location.assign(url);
 }
 
-function loadRecentPos() {
-  const raw = localStorage.getItem(RECENT_PO_KEY);
+function loadRecentSerials() {
+  const raw = localStorage.getItem(RECENT_SERIAL_KEY);
   const arr = safeParse(raw);
   return Array.isArray(arr) ? arr : [];
 }
 
-function saveRecentPo(po) {
-  const clean = sanitizePo(po);
+function saveRecentSerial(serial) {
+  const clean = sanitizeValue(serial);
   if (!clean) return;
-  const existing = loadRecentPos().filter((x) => x !== clean);
+  const existing = loadRecentSerials().filter((x) => x !== clean);
   const next = [clean, ...existing].slice(0, 10);
-  localStorage.setItem(RECENT_PO_KEY, JSON.stringify(next));
+  localStorage.setItem(RECENT_SERIAL_KEY, JSON.stringify(next));
 }
 
 // ---------------- UI primitives ----------------
@@ -306,16 +307,16 @@ export default function App() {
     }
   }, []);
 
-  // PO from URL + per-PO storage key
-  const poFromUrl = useMemo(() => getPoFromUrl(), []);
+  // Serial from URL + per-serial storage key
+  const serialFromUrl = useMemo(() => getSerialFromUrl(), []);
   const storageKey = useMemo(
-    () => `${STORAGE_KEY_PREFIX}:${poFromUrl || "NO_PO"}`,
-    [poFromUrl]
+    () => `${STORAGE_KEY_PREFIX}:${serialFromUrl || "NO_SERIAL"}`,
+    [serialFromUrl]
   );
 
   const defaultData = useMemo(
     () => ({
-      header: { productionOrder: "", panelSerial: "" },
+      header: { serialNumber: "", productionOrderOptional: "" },
       nav: { step: 0 },
 
       ip6: {
@@ -440,44 +441,47 @@ export default function App() {
     () => safeParse(localStorage.getItem(storageKey)) || defaultData
   );
 
-  // PO select (Option A)
-  const [poPick, setPoPick] = useState("");
-  const [recentPos, setRecentPos] = useState(() => loadRecentPos());
+  // Serial select (Option A)
+  const [serialPick, setSerialPick] = useState("");
+  const [recentSerials, setRecentSerials] = useState(() => loadRecentSerials());
 
   useEffect(() => {
-    setRecentPos(loadRecentPos());
+    setRecentSerials(loadRecentSerials());
   }, []);
 
-  // Lock PO from URL (once) + save to recent
+  // Lock serial from URL (once) + save to recent
   useEffect(() => {
-    if (!poFromUrl) return;
-    saveRecentPo(poFromUrl);
+    if (!serialFromUrl) return;
+    saveRecentSerial(serialFromUrl);
 
     setData((p) => {
-      if (p.header?.productionOrder) return p;
-      return { ...p, header: { ...p.header, productionOrder: poFromUrl } };
+      if (p.header?.serialNumber) return p;
+      return { ...p, header: { ...p.header, serialNumber: serialFromUrl } };
     });
-  }, [poFromUrl]);
+  }, [serialFromUrl]);
 
-  // Persist per-PO (safe)
+  // Persist per-serial (safe)
   const [storageWarning, setStorageWarning] = useState(false);
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify(data));
       setStorageWarning(false);
-    } catch (e) {
+    } catch {
       setStorageWarning(true);
     }
   }, [data, storageKey]);
 
-  const productionOrder = data.header.productionOrder;
-  const panelSerial = data.header.panelSerial;
+  const serialNumber = data.header.serialNumber;
+  const productionOrderOptional = data.header.productionOrderOptional;
   const step = data.nav?.step ?? 0;
 
-  const setProductionOrder = (v) =>
-    setData((p) => ({ ...p, header: { ...p.header, productionOrder: v } }));
-  const setPanelSerial = (v) =>
-    setData((p) => ({ ...p, header: { ...p.header, panelSerial: v } }));
+  const setSerialNumber = (v) =>
+    setData((p) => ({ ...p, header: { ...p.header, serialNumber: v } }));
+  const setProductionOrderOptional = (v) =>
+    setData((p) => ({
+      ...p,
+      header: { ...p.header, productionOrderOptional: v },
+    }));
   const goStep = (next) =>
     setData((p) => ({ ...p, nav: { ...p.nav, step: next } }));
 
@@ -493,7 +497,7 @@ export default function App() {
     }));
   }
 
-  // Click-to-green buttons (action flash)
+  // Click-to-green action flash
   const [activeAction, setActiveAction] = useState(null);
   const flashAction = (key) => {
     setActiveAction(key);
@@ -691,9 +695,11 @@ export default function App() {
     const a = document.createElement("a");
     a.href = url;
 
-    const po = (productionOrder || "").trim();
-    const ps = (panelSerial || "").trim();
-    a.download = `markup${po ? `_${po}` : ""}${ps ? `_${ps}` : ""}.png`;
+    const serial = (serialNumber || "").trim();
+    const prod = (productionOrderOptional || "").trim();
+    a.download = `markup${serial ? `_${serial}` : ""}${
+      prod ? `_${prod}` : ""
+    }.png`;
     a.click();
   }
 
@@ -714,6 +720,7 @@ export default function App() {
       i.src = dataUrl;
     });
 
+    // compress to avoid localStorage overflow
     const off = document.createElement("canvas");
     off.width = CANVAS_W;
     off.height = CANVAS_H;
@@ -774,9 +781,9 @@ export default function App() {
     gap: 14,
   };
 
-  // ---------------- Option A: PO Select Screen ----------------
-  if (!poFromUrl) {
-    const clean = sanitizePo(poPick);
+  // ---------------- Option A: Serial Select Screen ----------------
+  if (!serialFromUrl) {
+    const clean = sanitizeValue(serialPick);
 
     return (
       <div style={pageStyle}>
@@ -792,22 +799,22 @@ export default function App() {
           <div
             style={{
               marginTop: 10,
-              fontSize: 22,
+              fontSize: 20,
               fontWeight: 500,
               color: BLACK,
               textAlign: "center",
             }}
           >
-            Select Production Order
+            SELECT SERIAL NUMBER
           </div>
 
           <div style={{ height: 12 }} />
 
-          <FieldLabel>Production Order Number</FieldLabel>
+          <FieldLabel>Serial Number</FieldLabel>
           <TextField
-            value={poPick}
-            onChange={(e) => setPoPick(e.target.value)}
-            placeholder="Type here"
+            value={serialPick}
+            onChange={(e) => setSerialPick(e.target.value)}
+            placeholder="Scan RFID"
           />
 
           <div style={{ height: 12 }} />
@@ -815,32 +822,32 @@ export default function App() {
           <PrimaryButton
             onClick={() => {
               if (!clean) return;
-              saveRecentPo(clean);
-              goToPo(clean);
+              saveRecentSerial(clean);
+              goToSerial(clean);
             }}
             disabled={!clean}
           >
             Continue →
           </PrimaryButton>
 
-          {recentPos.length > 0 && (
+          {recentSerials.length > 0 && (
             <>
               <div style={{ height: 18 }} />
               <div style={{ fontSize: 13, fontWeight: 600, color: BLACK }}>
-                Recent POs
+                Recent Serial Numbers
               </div>
               <div style={{ height: 10 }} />
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                {recentPos.map((po) => (
+                {recentSerials.map((s) => (
                   <Button
-                    key={po}
+                    key={s}
                     onClick={() => {
-                      saveRecentPo(po);
-                      goToPo(po);
+                      saveRecentSerial(s);
+                      goToSerial(s);
                     }}
                   >
-                    {po}
+                    {s}
                   </Button>
                 ))}
               </div>
@@ -848,9 +855,7 @@ export default function App() {
           )}
 
           <div style={{ height: 14 }} />
-          <div style={{ fontSize: 12, color: "#666" }}>
-            You’ll always start here and pick a production order.
-          </div>
+          <div style={{ fontSize: 12, color: "#666" }}>Get it done</div>
         </Card>
       </div>
     );
@@ -1360,26 +1365,26 @@ export default function App() {
           }}
         >
           <div>
-            <FieldLabel>Production Order</FieldLabel>
+            <FieldLabel>Serial Number</FieldLabel>
             <TextField
-              value={productionOrder}
-              onChange={(e) => setProductionOrder(e.target.value)}
-              placeholder="Use a production order link"
-              readOnly={!!poFromUrl}
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+              placeholder="Use a serial link (?serial=...) or type here"
+              readOnly={!!serialFromUrl}
             />
-            {!!poFromUrl && (
+            {!!serialFromUrl && (
               <div style={{ fontSize: 12, color: BLACK, marginTop: 6 }}>
-                Locked from link: <b>{poFromUrl}</b>
+                Locked from link (Serial Number): <b>{serialFromUrl}</b>
               </div>
             )}
           </div>
 
           <div>
-            <FieldLabel>Panel Serial</FieldLabel>
+            <FieldLabel>Production Order (Optional)</FieldLabel>
             <TextField
-              value={panelSerial}
-              onChange={(e) => setPanelSerial(e.target.value)}
-              placeholder="Enter panel serial"
+              value={productionOrderOptional}
+              onChange={(e) => setProductionOrderOptional(e.target.value)}
+              placeholder="Enter production order (optional)"
             />
           </div>
         </div>
@@ -1410,12 +1415,16 @@ export default function App() {
         >
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
             <div style={contextChip}>
-              <span style={{ fontWeight: 500, color: BRAND }}>PO</span>
-              <span>{productionOrder || "—"}</span>
+              <span style={{ fontWeight: 500, color: BRAND }}>
+                Serial Number
+              </span>
+              <span>{serialNumber || "—"}</span>
             </div>
             <div style={contextChip}>
-              <span style={{ fontWeight: 500, color: BRAND }}>Panel</span>
-              <span>{panelSerial || "—"}</span>
+              <span style={{ fontWeight: 500, color: BRAND }}>
+                Production Order
+              </span>
+              <span>{productionOrderOptional || "—"}</span>
             </div>
           </div>
 
