@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const STORAGE_KEY_PREFIX = "quality-master-live-form:v15";
+const STORAGE_KEY_PREFIX = "quality-master-live-form:v16";
+const RECENT_PO_KEY = "quality-master:recent-pos";
 
 // Branding
 const BRAND = "#2cb889";
@@ -45,6 +46,31 @@ function safeParse(raw) {
 function getPoFromUrl() {
   const params = new URLSearchParams(window.location.search);
   return (params.get("po") || "").trim();
+}
+
+function sanitizePo(input) {
+  return String(input || "").trim();
+}
+
+function goToPo(po) {
+  const clean = sanitizePo(po);
+  if (!clean) return;
+  const url = `/?po=${encodeURIComponent(clean)}`;
+  window.location.assign(url);
+}
+
+function loadRecentPos() {
+  const raw = localStorage.getItem(RECENT_PO_KEY);
+  const arr = safeParse(raw);
+  return Array.isArray(arr) ? arr : [];
+}
+
+function saveRecentPo(po) {
+  const clean = sanitizePo(po);
+  if (!clean) return;
+  const existing = loadRecentPos().filter((x) => x !== clean);
+  const next = [clean, ...existing].slice(0, 10);
+  localStorage.setItem(RECENT_PO_KEY, JSON.stringify(next));
 }
 
 // ---------------- UI primitives ----------------
@@ -414,9 +440,19 @@ export default function App() {
     () => safeParse(localStorage.getItem(storageKey)) || defaultData
   );
 
-  // Lock PO from URL (once)
+  // PO select (Option A)
+  const [poPick, setPoPick] = useState("");
+  const [recentPos, setRecentPos] = useState(() => loadRecentPos());
+
+  useEffect(() => {
+    setRecentPos(loadRecentPos());
+  }, []);
+
+  // Lock PO from URL (once) + save to recent
   useEffect(() => {
     if (!poFromUrl) return;
+    saveRecentPo(poFromUrl);
+
     setData((p) => {
       if (p.header?.productionOrder) return p;
       return { ...p, header: { ...p.header, productionOrder: poFromUrl } };
@@ -457,7 +493,7 @@ export default function App() {
     }));
   }
 
-  // Click-to-green buttons
+  // Click-to-green buttons (action flash)
   const [activeAction, setActiveAction] = useState(null);
   const flashAction = (key) => {
     setActiveAction(key);
@@ -738,7 +774,89 @@ export default function App() {
     gap: 14,
   };
 
-  // Step view (NOT a nested component)
+  // ---------------- Option A: PO Select Screen ----------------
+  if (!poFromUrl) {
+    const clean = sanitizePo(poPick);
+
+    return (
+      <div style={pageStyle}>
+        <Card style={{ maxWidth: 700, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <img
+              src={LOGO_URL}
+              alt=""
+              style={{ height: LOGO_HEIGHT_PX, objectFit: "contain" }}
+            />
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              fontSize: 22,
+              fontWeight: 500,
+              color: BLACK,
+              textAlign: "center",
+            }}
+          >
+            Select Production Order
+          </div>
+
+          <div style={{ height: 12 }} />
+
+          <FieldLabel>Production Order Number</FieldLabel>
+          <TextField
+            value={poPick}
+            onChange={(e) => setPoPick(e.target.value)}
+            placeholder="Type here"
+          />
+
+          <div style={{ height: 12 }} />
+
+          <PrimaryButton
+            onClick={() => {
+              if (!clean) return;
+              saveRecentPo(clean);
+              goToPo(clean);
+            }}
+            disabled={!clean}
+          >
+            Continue →
+          </PrimaryButton>
+
+          {recentPos.length > 0 && (
+            <>
+              <div style={{ height: 18 }} />
+              <div style={{ fontSize: 13, fontWeight: 600, color: BLACK }}>
+                Recent POs
+              </div>
+              <div style={{ height: 10 }} />
+
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                {recentPos.map((po) => (
+                  <Button
+                    key={po}
+                    onClick={() => {
+                      saveRecentPo(po);
+                      goToPo(po);
+                    }}
+                  >
+                    {po}
+                  </Button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <div style={{ height: 14 }} />
+          <div style={{ fontSize: 12, color: "#666" }}>
+            You’ll always start here and pick a production order.
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // ---------------- Step content ----------------
   let stepView = null;
 
   if (step === 0) {
@@ -1187,8 +1305,8 @@ export default function App() {
           {storageWarning && (
             <div style={{ fontSize: 12, color: "#b00020", marginTop: 8 }}>
               Storage warning: uploaded image may be too large to save
-              permanently. (This version compresses uploads—try uploading again
-              if it still disappears.)
+              permanently. (Uploads are compressed; try again if it still
+              disappears.)
             </div>
           )}
         </Card>
@@ -1200,7 +1318,7 @@ export default function App() {
     <div style={pageStyle}>
       {/* HEADER */}
       <Card style={{ padding: 16 }}>
-        {/* Logo row: LEFT */}
+        {/* Logo row: left */}
         <div
           style={{
             display: "flex",
@@ -1215,7 +1333,7 @@ export default function App() {
           />
         </div>
 
-        {/* Title row: centered under the header area */}
+        {/* Title row: centered under logo */}
         <div
           style={{
             width: "100%",
