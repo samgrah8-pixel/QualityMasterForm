@@ -20,7 +20,7 @@ export const handler = async () => {
 
     // simplest DB check: run a lightweight query
     const { data, error } = await supabase
-      .from("test_table")
+      .from("quality_forms")
       .select("*")
       .limit(1);
 
