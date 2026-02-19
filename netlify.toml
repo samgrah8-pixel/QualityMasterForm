@@ -3,6 +3,13 @@
   publish = "build"
   functions = "netlify/functions"
 
+# Don't rewrite function calls
+[[redirects]]
+  from = "/.netlify/functions/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback
 [[redirects]]
   from = "/*"
   to = "/index.html"
