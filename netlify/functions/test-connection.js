@@ -1,24 +1,24 @@
-const { createClient } = require("@supabase/supabase-js");
+import { createClient } from "@supabase/supabase-js";
 
-exports.handler = async () => {
+export const handler = async () => {
   try {
     const url = process.env.SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!url || !key) {
+    if (!url || !serviceRole) {
       return {
         statusCode: 500,
-        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           success: false,
-          error: "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY env vars",
+          error:
+            "Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in environment variables",
         }),
       };
     }
 
-    const supabase = createClient(url, key);
+    const supabase = createClient(url, serviceRole);
 
-    // simple query just to prove auth + DB access works
+    // simplest DB check: run a lightweight query
     const { data, error } = await supabase
       .from("test_table")
       .select("*")
@@ -28,7 +28,6 @@ exports.handler = async () => {
 
     return {
       statusCode: 200,
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         success: true,
         message: "Supabase connected",
@@ -38,7 +37,6 @@ exports.handler = async () => {
   } catch (err) {
     return {
       statusCode: 500,
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({
         success: false,
         error: err?.message || String(err),
