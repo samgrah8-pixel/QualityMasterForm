@@ -19,7 +19,6 @@ exports.handler = async () => {
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // simple read to verify connectivity + table exists
     const { data, error } = await supabase
       .from("quality_forms")
       .select("serial")
@@ -30,11 +29,7 @@ exports.handler = async () => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        success: true,
-        message: "Supabase connected",
-        data: data || [],
-      }),
+      body: JSON.stringify({ success: true, data: data ?? [] }),
     };
   } catch (err) {
     return {
